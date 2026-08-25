@@ -15,6 +15,14 @@ topics:
   - popup
   - context-menu
 
+screenshots:
+  - description: >-
+      A row's actions, in a popover anchored to the row rather than to the
+      screen.
+    path: doc/screenshot.png
+  - description: The same popover in a dark theme.
+    path: doc/screenshot_dark.png
+
 environment:
   sdk: ^3.13.0
   flutter: ">=3.47.0"
