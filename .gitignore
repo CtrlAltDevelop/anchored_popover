@@ -1,0 +1,10 @@
+.dart_tool/
+.packages
+build/
+pubspec.lock
+.idea/
+*.iml
+.DS_Store
+
+# Golden failure artefacts written beside the screenshot tool.
+example/tool/failures/
