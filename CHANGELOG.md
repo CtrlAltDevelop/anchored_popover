@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.1.0
+## 1.0.0
 
-Initial release.
+Initial stable release.
 
 - `AnchoredPopover`, which opens a popover positioned against its child rather
   than against the screen, on a long press, a tap, a secondary tap, or nothing
