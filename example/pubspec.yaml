@@ -2,6 +2,8 @@ name: anchored_popover_example
 publish_to: none
 
 environment:
+  # The oldest SDK the package itself supports: an example that needs a
+  # newer one is not an example of what the package promises.
   sdk: ^3.12.0
 
 dependencies:
