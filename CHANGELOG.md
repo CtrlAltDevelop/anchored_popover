@@ -54,7 +54,10 @@ differently, and no other API changed.
 - The Flutter constraint is relaxed to `>=3.44.0`, verified against that
   version, and CI builds against both it and the latest stable.
 - Every line of `lib/` is covered by tests, and CI fails if that stops being
-  true.
+  true. The long-press haptic is asserted at the platform channel, since no
+  test can feel one.
+- Verified by hand on an Android emulator (back gesture, long press, safe
+  area) and in a desktop browser (hover).
 - Golden tests for the surface, the scrim, flipping and the entrance
   transition. They are skipped by an ordinary `flutter test`, because rendering
   differs between Flutter versions and platforms; run them with

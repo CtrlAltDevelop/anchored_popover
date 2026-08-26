@@ -1738,6 +1738,89 @@ void main() {
     });
   });
 
+  group('haptics', () {
+    /// Records what the widget asks the platform to do.
+    List<MethodCall> platformCalls(WidgetTester tester) {
+      final List<MethodCall> calls = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall call) async {
+          calls.add(call);
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      return calls;
+    }
+
+    Widget androidHost(Widget popover) => MaterialApp(
+      theme: ThemeData(platform: TargetPlatform.android),
+      home: Scaffold(
+        body: Center(
+          child: SizedBox(
+            key: anchorKey,
+            width: 100,
+            height: 40,
+            child: popover,
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('a long press asks the platform for its long-press feedback', (
+      WidgetTester tester,
+    ) async {
+      final List<MethodCall> calls = platformCalls(tester);
+      await tester.pumpWidget(
+        androidHost(
+          AnchoredPopover(
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        calls.map((MethodCall call) => call.method),
+        contains('HapticFeedback.vibrate'),
+      );
+    });
+
+    testWidgets('enableFeedback false asks for nothing', (
+      WidgetTester tester,
+    ) async {
+      final List<MethodCall> calls = platformCalls(tester);
+      await tester.pumpWidget(
+        androidHost(
+          AnchoredPopover(
+            autoDismiss: false,
+            enableFeedback: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        calls.map((MethodCall call) => call.method),
+        isNot(contains('HapticFeedback.vibrate')),
+      );
+      expect(find.byKey(popoverKey), findsOneWidget);
+    });
+  });
+
   group('appearance', () {
     testWidgets('decorate wraps the content in a PopoverSurface', (
       WidgetTester tester,
