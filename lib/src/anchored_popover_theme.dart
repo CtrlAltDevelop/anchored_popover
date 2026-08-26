@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// App-wide look and timing for every [AnchoredPopover] and [PopoverSurface].
@@ -34,6 +35,8 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
     this.reverseTransitionDuration,
     this.curve,
     this.reverseCurve,
+    this.hoverEnterDuration,
+    this.hoverExitDuration,
   });
 
   /// Fill colour of the surface behind the popover's content.
@@ -79,6 +82,14 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
 
   /// Curve of the exit transition.
   final Curve? reverseCurve;
+
+  /// How long the pointer must rest on the anchor before a
+  /// [PopoverTrigger.hover] popover opens.
+  final Duration? hoverEnterDuration;
+
+  /// How long after the pointer leaves both the anchor and the popover a
+  /// [PopoverTrigger.hover] popover closes.
+  final Duration? hoverExitDuration;
 
   /// The theme registered on the ambient [ThemeData], or null if there is none.
   static AnchoredPopoverTheme? maybeOf(BuildContext context) =>
@@ -134,6 +145,9 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
           reverseTransitionDuration ?? const Duration(milliseconds: 90),
       curve: curve ?? Curves.easeOutCubic,
       reverseCurve: reverseCurve ?? Curves.easeIn,
+      hoverEnterDuration:
+          hoverEnterDuration ?? const Duration(milliseconds: 300),
+      hoverExitDuration: hoverExitDuration ?? const Duration(milliseconds: 100),
     );
   }
 
@@ -152,6 +166,8 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
     Duration? reverseTransitionDuration,
     Curve? curve,
     Curve? reverseCurve,
+    Duration? hoverEnterDuration,
+    Duration? hoverExitDuration,
   }) {
     return AnchoredPopoverTheme(
       backgroundColor: backgroundColor ?? this.backgroundColor,
@@ -168,6 +184,8 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
           reverseTransitionDuration ?? this.reverseTransitionDuration,
       curve: curve ?? this.curve,
       reverseCurve: reverseCurve ?? this.reverseCurve,
+      hoverEnterDuration: hoverEnterDuration ?? this.hoverEnterDuration,
+      hoverExitDuration: hoverExitDuration ?? this.hoverExitDuration,
     );
   }
 
@@ -199,8 +217,56 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
           : reverseTransitionDuration,
       curve: takeOther ? other.curve : curve,
       reverseCurve: takeOther ? other.reverseCurve : reverseCurve,
+      hoverEnterDuration: takeOther
+          ? other.hoverEnterDuration
+          : hoverEnterDuration,
+      hoverExitDuration: takeOther
+          ? other.hoverExitDuration
+          : hoverExitDuration,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is AnchoredPopoverTheme &&
+        other.backgroundColor == backgroundColor &&
+        other.borderRadius == borderRadius &&
+        other.shape == shape &&
+        other.borderSide == borderSide &&
+        other.padding == padding &&
+        listEquals(other.shadows, shadows) &&
+        other.textStyle == textStyle &&
+        other.screenPadding == screenPadding &&
+        other.showDuration == showDuration &&
+        other.transitionDuration == transitionDuration &&
+        other.reverseTransitionDuration == reverseTransitionDuration &&
+        other.curve == curve &&
+        other.reverseCurve == reverseCurve &&
+        other.hoverEnterDuration == hoverEnterDuration &&
+        other.hoverExitDuration == hoverExitDuration;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    backgroundColor,
+    borderRadius,
+    shape,
+    borderSide,
+    padding,
+    shadows == null ? null : Object.hashAll(shadows!),
+    textStyle,
+    screenPadding,
+    showDuration,
+    transitionDuration,
+    reverseTransitionDuration,
+    curve,
+    reverseCurve,
+    hoverEnterDuration,
+    hoverExitDuration,
+  );
 
   /// [BorderSide.lerp] rejects nulls and cannot interpolate to or from "unset",
   /// so a null endpoint snaps instead.

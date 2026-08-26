@@ -37,8 +37,9 @@ import 'package:anchored_popover/anchored_popover.dart';
 
 ## Features
 
-- Long-press, tap, secondary-click, or purely programmatic triggers.
+- Long-press, tap, secondary-click, hover, or purely programmatic triggers.
 - Optional auto-dismiss, outside-tap dismissal, and a scrim.
+- Escape and the system back gesture close it; focus can move in and back out.
 - A controller and a `GlobalKey` state API for imperative use.
 - Screen-safe placement, with vertical flipping and edge clamping.
 - Anchor following inside a scrollable — or dismissal on scroll, if you prefer.
@@ -84,6 +85,7 @@ that is an `InkWell` with an `onTap` stays tappable.
 | `longPress` | A long press. What a row in a list usually wants. |
 | `tap` | A single tap, which toggles. |
 | `secondaryTap` | A right click, or a two-finger trackpad tap. |
+| `hover` | The pointer resting on the child, for a rich tooltip. Adds no recogniser. |
 | `manual` | Nothing — the popover opens only through its controller. |
 
 ## Programmatic control
@@ -119,12 +121,31 @@ final key = GlobalKey<AnchoredPopoverState>();
 key.currentState?.toggle();
 ```
 
-## Inside a scrolling list
+## Following a moving anchor
 
-By default the popover re-anchors itself as the enclosing scrollable moves, so
-it stays pinned to its row. Only the position is recomputed, not the content.
-Set `dismissOnScroll: true` for the other convention, or
+By default the popover re-anchors itself as the anchor moves, so it stays
+pinned to its row. That covers every scrollable the anchor sits inside — not
+just the innermost one — along with window resizes and the software keyboard
+opening under it. Only the position is recomputed, not the content. Set
+`dismissOnScroll: true` for the other convention, or
 `followAnchorOnScroll: false` to leave it where it opened.
+
+An anchor can also move without any of those happening: one being animated, or
+a row being dragged in a `ReorderableListView`. For those, add
+`followAnchorEveryFrame: true`:
+
+```dart
+AnchoredPopover(
+  followAnchorEveryFrame: true,
+  popoverBuilder: (context, dismiss) => const Text('Dragging'),
+  child: ReorderableRow(index: index),
+);
+```
+
+It schedules no frames of its own — it looks at the anchor on frames that were
+going to happen anyway, which is all an animation or a drag produces — and
+relayouts only when the anchor has actually moved. It is off by default because
+most anchors only ever move for a reason the default already covers.
 
 ## Theming
 
@@ -167,9 +188,19 @@ so text styles and ink respond normally.
 | `showDuration` | 3 s | How long it stays up when `autoDismiss` is set. |
 | `dismissOnTapOutside` | `true` | Whether a tap outside closes it. The tap is absorbed. |
 | `dismissOnScroll` | `false` | Whether scrolling closes it instead of moving it. |
-| `followAnchorOnScroll` | `true` | Whether it re-anchors as the scrollable moves. |
+| `followAnchorOnScroll` | `true` | Whether it re-anchors as the anchor moves. |
+| `followAnchorEveryFrame` | `false` | Whether it also checks the anchor every frame. |
 | `flip` | `true` | Whether it may flip to the anchor's other side. |
 | `barrierColor` | none | Colour of a full-screen scrim, which also absorbs taps. |
+| `barrierSemanticLabel` | localised | Dismiss label a screen reader reads on the scrim. |
+| `dismissOnEscape` | `true` | Whether escape closes it, focused or not. |
+| `dismissOnBackButton` | `true` | Whether back closes it instead of popping the route. |
+| `autofocus` | `false` | Whether opening it moves focus into the content. |
+| `restoreFocus` | `true` | Whether closing it puts focus back where it was. |
+| `enableFeedback` | `true` | Whether a long press plays the platform's haptic. |
+| `pauseAutoDismissOnHover` | `true` | Whether the timer stops while the pointer is on it. |
+| `hoverEnterDuration` | 300 ms | Rest before a `hover` popover opens. |
+| `hoverExitDuration` | 100 ms | Grace after the pointer leaves both anchor and popover. |
 | `decorate` | `true` | Whether to wrap the content in a `PopoverSurface`. |
 | `screenPadding` | `EdgeInsets.all(8)` | How close to the overlay's edge it may sit. |
 | `transitionDuration` | 120 ms | Fade and scale in. |
@@ -178,13 +209,50 @@ so text styles and ink respond normally.
 | `semanticLabel` | none | Announced by screen readers when it opens. |
 | `onShow` / `onDismiss` | none | Called when it opens and when it starts closing. |
 
+## Keyboard and pointer
+
+Escape closes an open popover whether or not anything inside it has focus, so a
+popover opened by a long press is still dismissible from the keyboard. On
+Android the system back gesture closes the popover rather than the page under
+it. Both are opt-out, through `dismissOnEscape` and `dismissOnBackButton`.
+
+A popover holding controls — a menu, a confirmation — should take focus, so the
+keyboard lands on those controls next and comes back to the anchor when the
+popover closes:
+
+```dart
+AnchoredPopover(
+  autofocus: true,
+  popoverBuilder: (context, dismiss) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      TextButton(onPressed: dismiss, child: const Text('Watch')),
+      TextButton(onPressed: dismiss, child: const Text('Alert')),
+    ],
+  ),
+  child: MarketRow(symbol: 'BTC'),
+);
+```
+
+It is off by default, because a popover that opens beside a text field should
+not take the caret out of it.
+
+Under `PopoverTrigger.hover` the popover opens once the pointer has rested on
+the anchor, and stays up while the pointer is on the popover itself — so it can
+hold something to click, unlike a `Tooltip`. It adds no gesture recogniser at
+all, which leaves the anchor exactly as tappable as it was and leaves a touch
+user, who never hovers, unaffected. For every other trigger the pointer resting
+on the popover just holds off the auto-dismiss timer, which restarts when the
+pointer leaves.
+
 ## Accessibility
 
 The long-press recogniser is not excluded from semantics: it contributes a
 long-press action to the child's node, which is how a screen-reader user reaches
 the popover at all. Give `semanticLabel` a value when the content is not
 readable on its own, and it is announced as a live region when the popover
-opens.
+opens. The scrim is a `ModalBarrier`, so it carries the platform's localised
+dismiss action.
 
 Because the content renders through an `OverlayPortal`, it is built in the
 anchor's own place in the tree — so `Theme`, `Directionality`, `MediaQuery` and

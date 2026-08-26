@@ -1,4 +1,6 @@
 import 'package:anchored_popover/anchored_popover.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -738,6 +740,1001 @@ void main() {
       second.show();
       await tester.pumpAndSettle();
       expect(find.byKey(popoverKey), findsOneWidget);
+    });
+  });
+
+  group('keyboard', () {
+    testWidgets('escape closes the popover', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+
+      // Nothing inside the popover has focus: a popover opened by a pointer
+      // still has to answer the keyboard.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('dismissOnEscape false ignores it', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            dismissOnEscape: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+    });
+
+    testWidgets('escape stops being handled once the anchor is gone', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('focus', () {
+    testWidgets('autofocus takes focus and gives it back', (
+      WidgetTester tester,
+    ) async {
+      final FocusNode anchorFocus = FocusNode();
+      addTearDown(anchorFocus.dispose);
+      final AnchoredPopoverController controller = AnchoredPopoverController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Focus(
+              focusNode: anchorFocus,
+              autofocus: true,
+              child: AnchoredPopover(
+                controller: controller,
+                trigger: PopoverTrigger.manual,
+                autoDismiss: false,
+                autofocus: true,
+                popoverBuilder: (_, _) => content(),
+                child: const Placeholder(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(anchorFocus.hasFocus, isTrue);
+
+      controller.show();
+      await tester.pumpAndSettle();
+      expect(anchorFocus.hasPrimaryFocus, isFalse);
+
+      controller.hide();
+      await tester.pumpAndSettle();
+      expect(anchorFocus.hasPrimaryFocus, isTrue);
+    });
+
+    testWidgets('it leaves focus alone by default', (
+      WidgetTester tester,
+    ) async {
+      final FocusNode anchorFocus = FocusNode();
+      addTearDown(anchorFocus.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Focus(
+              focusNode: anchorFocus,
+              autofocus: true,
+              child: SizedBox(
+                key: anchorKey,
+                width: 100,
+                height: 40,
+                child: AnchoredPopover(
+                  autoDismiss: false,
+                  popoverBuilder: (_, _) => content(),
+                  child: const Placeholder(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      expect(anchorFocus.hasPrimaryFocus, isTrue);
+    });
+  });
+
+  group('hover', () {
+    /// A mouse already on screen, away from the anchor.
+    Future<TestGesture> mouse(WidgetTester tester) async {
+      final TestGesture gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      return gesture;
+    }
+
+    testWidgets('the pointer resting on the anchor opens it, and leaving '
+        'closes it', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            trigger: PopoverTrigger.hover,
+            autoDismiss: false,
+            hoverEnterDuration: const Duration(milliseconds: 200),
+            hoverExitDuration: const Duration(milliseconds: 100),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      final TestGesture gesture = await mouse(tester);
+
+      await gesture.moveTo(tester.getCenter(find.byKey(anchorKey)));
+      await tester.pump();
+      // Not on the first frame: a pointer passing over an anchor on its way
+      // somewhere else should open nothing.
+      expect(find.byKey(popoverKey), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+
+      await gesture.moveTo(Offset.zero);
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('the popover stays up while the pointer is on it', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            trigger: PopoverTrigger.hover,
+            autoDismiss: false,
+            hoverEnterDuration: const Duration(milliseconds: 200),
+            hoverExitDuration: const Duration(milliseconds: 100),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      final TestGesture gesture = await mouse(tester);
+
+      await gesture.moveTo(tester.getCenter(find.byKey(anchorKey)));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      await gesture.moveTo(tester.getCenter(find.byKey(popoverKey)));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+    });
+
+    testWidgets('a hover popover lays no barrier over the screen', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            trigger: PopoverTrigger.hover,
+            autoDismiss: false,
+            hoverEnterDuration: Duration.zero,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      final TestGesture gesture = await mouse(tester);
+      // The route lays one of its own; the popover should add none.
+      final int routeBarriers = find.byType(ModalBarrier).evaluate().length;
+
+      await gesture.moveTo(tester.getCenter(find.byKey(anchorKey)));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+      expect(find.byType(ModalBarrier), findsNWidgets(routeBarriers));
+    });
+
+    testWidgets('the pointer on the popover holds off auto-dismiss', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            showDuration: const Duration(milliseconds: 500),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      final TestGesture gesture = await mouse(tester);
+
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      await gesture.moveTo(tester.getCenter(find.byKey(popoverKey)));
+      await tester.pump();
+
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+
+      // Leaving restarts the timer rather than closing it outright.
+      await gesture.moveTo(Offset.zero);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(popoverKey), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('pauseAutoDismissOnHover false dismisses on time', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            showDuration: const Duration(milliseconds: 500),
+            pauseAutoDismissOnHover: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      final TestGesture gesture = await mouse(tester);
+
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      await gesture.moveTo(tester.getCenter(find.byKey(popoverKey)));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+  });
+
+  group('back button', () {
+    testWidgets('back closes the popover instead of the route', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (BuildContext context) => Center(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => Scaffold(
+                        body: Center(
+                          child: SizedBox(
+                            key: anchorKey,
+                            width: 100,
+                            height: 40,
+                            child: AnchoredPopover(
+                              autoDismiss: false,
+                              popoverBuilder: (_, _) => content(),
+                              child: const Placeholder(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+      // The page it was on is still there.
+      expect(find.byKey(anchorKey), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('open'), findsOneWidget);
+    });
+  });
+
+  group('updating while open', () {
+    testWidgets('dismissOnEscape turned off stops closing it', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            dismissOnEscape: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+    });
+
+    testWidgets('dismissOnEscape turned on starts closing it', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            dismissOnEscape: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('a new showDuration restarts the timer', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            showDuration: const Duration(seconds: 10),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            showDuration: const Duration(milliseconds: 200),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('autoDismiss turned off keeps it up', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            showDuration: const Duration(seconds: 2),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            showDuration: const Duration(seconds: 2),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+    });
+
+    testWidgets('a trigger that is no longer hover drops a pending open', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            trigger: PopoverTrigger.hover,
+            hoverEnterDuration: const Duration(milliseconds: 300),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      final TestGesture gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.byKey(anchorKey)));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            trigger: PopoverTrigger.tap,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+  });
+
+  group('following a moving anchor', () {
+    testWidgets('an outer scrollable moves it, not just the innermost one', (
+      WidgetTester tester,
+    ) async {
+      final ScrollController outer = ScrollController();
+      addTearDown(outer.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListView(
+              controller: outer,
+              children: <Widget>[
+                const SizedBox(height: 300),
+                SizedBox(
+                  height: 200,
+                  child: ListView(
+                    children: <Widget>[
+                      SizedBox(
+                        key: anchorKey,
+                        width: 100,
+                        height: 40,
+                        child: AnchoredPopover(
+                          autoDismiss: false,
+                          popoverBuilder: (_, _) => content(),
+                          child: const Placeholder(),
+                        ),
+                      ),
+                      const SizedBox(height: 600),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 600),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      final double anchorBefore = tester.getTopLeft(find.byKey(anchorKey)).dy;
+      final double popoverBefore = tester.getTopLeft(find.byKey(popoverKey)).dy;
+
+      // The inner list has not moved at all; only the outer one has.
+      outer.jumpTo(120);
+      await tester.pumpAndSettle();
+
+      expect(tester.getTopLeft(find.byKey(anchorKey)).dy, anchorBefore - 120);
+      expect(tester.getTopLeft(find.byKey(popoverKey)).dy, popoverBefore - 120);
+    });
+
+    testWidgets('a window resize re-anchors it', (WidgetTester tester) async {
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      final double before = tester.getTopLeft(find.byKey(popoverKey)).dy;
+      final double gap = tester.getTopLeft(find.byKey(anchorKey)).dy - before;
+
+      tester.view.physicalSize = const Size(800, 1200);
+      await tester.pumpAndSettle();
+
+      final double after = tester.getTopLeft(find.byKey(popoverKey)).dy;
+      expect(after, isNot(before));
+      expect(tester.getTopLeft(find.byKey(anchorKey)).dy - after, gap);
+    });
+
+    /// An anchor that slides down the screen without its subtree rebuilding,
+    /// which is what an animation or a drag does.
+    Widget slidingHost({
+      required double top,
+      required bool everyFrame,
+      required AnchoredPopoverController controller,
+    }) => MaterialApp(
+      home: Scaffold(
+        body: Stack(
+          children: <Widget>[
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 400),
+              left: 100,
+              top: top,
+              child: SizedBox(
+                key: anchorKey,
+                width: 100,
+                height: 40,
+                child: AnchoredPopover(
+                  controller: controller,
+                  trigger: PopoverTrigger.manual,
+                  autoDismiss: false,
+                  followAnchorEveryFrame: everyFrame,
+                  popoverBuilder: (_, _) => content(),
+                  child: const Placeholder(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    testWidgets('followAnchorEveryFrame keeps up with an animating anchor', (
+      WidgetTester tester,
+    ) async {
+      final AnchoredPopoverController controller = AnchoredPopoverController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        slidingHost(top: 100, everyFrame: true, controller: controller),
+      );
+      controller.show();
+      await tester.pumpAndSettle();
+      final double gap =
+          tester.getTopLeft(find.byKey(anchorKey)).dy -
+          tester.getTopLeft(find.byKey(popoverKey)).dy;
+
+      await tester.pumpWidget(
+        slidingHost(top: 400, everyFrame: true, controller: controller),
+      );
+      // In frames, the way the animation would really arrive. The check looks
+      // at the anchor after a frame has drawn and relayouts on the next one, so
+      // the popover trails by a single frame of the anchor's movement — a few
+      // pixels at 60fps, and nothing at all once the anchor stops.
+      for (int i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+
+      // Mid-animation: the anchor has left 100 and not yet reached 400.
+      final double anchor = tester.getTopLeft(find.byKey(anchorKey)).dy;
+      expect(anchor, greaterThan(100));
+      expect(anchor, lessThan(400));
+      expect(
+        anchor - tester.getTopLeft(find.byKey(popoverKey)).dy,
+        closeTo(gap, 20),
+      );
+
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.byKey(anchorKey)).dy, 400);
+      expect(400 - tester.getTopLeft(find.byKey(popoverKey)).dy, gap);
+    });
+
+    testWidgets('without it, an animating anchor leaves the popover behind', (
+      WidgetTester tester,
+    ) async {
+      final AnchoredPopoverController controller = AnchoredPopoverController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        slidingHost(top: 100, everyFrame: false, controller: controller),
+      );
+      controller.show();
+      await tester.pumpAndSettle();
+      final double before = tester.getTopLeft(find.byKey(popoverKey)).dy;
+
+      await tester.pumpWidget(
+        slidingHost(top: 400, everyFrame: false, controller: controller),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(tester.getTopLeft(find.byKey(anchorKey)).dy, greaterThan(100));
+      expect(tester.getTopLeft(find.byKey(popoverKey)).dy, before);
+    });
+
+    testWidgets('the frame check stops with the popover', (
+      WidgetTester tester,
+    ) async {
+      final AnchoredPopoverController controller = AnchoredPopoverController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        slidingHost(top: 100, everyFrame: true, controller: controller),
+      );
+      controller.show();
+      await tester.pumpAndSettle();
+      controller.hide();
+      await tester.pumpAndSettle();
+
+      // The per-frame check must never be what keeps frames coming.
+      expect(tester.binding.hasScheduledFrame, isFalse);
+    });
+  });
+
+  group('coverage of the remaining paths', () {
+    testWidgets('secondaryTap opens the popover', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            trigger: PopoverTrigger.secondaryTap,
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+
+      expect(find.byKey(popoverKey), findsNothing);
+      final TestGesture gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(anchorKey)),
+        buttons: kSecondaryButton,
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+    });
+
+    testWidgets('hover durations fall back to the theme', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(
+            extensions: const <ThemeExtension<dynamic>>[
+              AnchoredPopoverTheme(
+                hoverEnterDuration: Duration(milliseconds: 200),
+                hoverExitDuration: Duration(milliseconds: 200),
+              ),
+            ],
+          ),
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                key: anchorKey,
+                width: 100,
+                height: 40,
+                child: AnchoredPopover(
+                  trigger: PopoverTrigger.hover,
+                  autoDismiss: false,
+                  popoverBuilder: (_, _) => content(),
+                  child: const Placeholder(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final TestGesture gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.byKey(anchorKey)));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(popoverKey), findsNothing);
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+
+      await gesture.moveTo(Offset.zero);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(popoverKey), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('the pointer leaving the popover closes a hover popover', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            trigger: PopoverTrigger.hover,
+            autoDismiss: false,
+            hoverEnterDuration: const Duration(milliseconds: 100),
+            hoverExitDuration: const Duration(milliseconds: 100),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      final TestGesture gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.byKey(anchorKey)));
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+      await gesture.moveTo(tester.getCenter(find.byKey(popoverKey)));
+      await tester.pump();
+
+      // Off the popover, and not back onto the anchor.
+      await gesture.moveTo(const Offset(5, 5));
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('a pointer passing over the anchor opens nothing', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            trigger: PopoverTrigger.hover,
+            hoverEnterDuration: const Duration(milliseconds: 300),
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      final TestGesture gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.byKey(anchorKey)));
+      await tester.pump(const Duration(milliseconds: 100));
+      // Gone again before the popover was due to open.
+      await gesture.moveTo(Offset.zero);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('escape inside the popover arrives as a DismissIntent', (
+      WidgetTester tester,
+    ) async {
+      final FocusNode inside = FocusNode();
+      addTearDown(inside.dispose);
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            autoDismiss: false,
+            autofocus: true,
+            popoverBuilder: (_, _) =>
+                Focus(focusNode: inside, autofocus: true, child: content()),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      expect(inside.hasPrimaryFocus, isTrue);
+
+      // Focus is inside, so the keyboard handler stands aside and the key
+      // travels the ordinary Actions path instead.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('dropping a controller while closed makes a fresh one', (
+      WidgetTester tester,
+    ) async {
+      final AnchoredPopoverController controller = AnchoredPopoverController();
+      addTearDown(controller.dispose);
+      final GlobalKey<AnchoredPopoverState> key =
+          GlobalKey<AnchoredPopoverState>();
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            key: key,
+            controller: controller,
+            trigger: PopoverTrigger.manual,
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            key: key,
+            trigger: PopoverTrigger.manual,
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      expect(key.currentState!.isOpen, isFalse);
+
+      // The internal controller it made for itself drives it.
+      key.currentState!.show();
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+      // The controller it no longer holds does not.
+      controller.hide();
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+    });
+
+    testWidgets('turning both follow flags off detaches the listeners', (
+      WidgetTester tester,
+    ) async {
+      final ScrollController scroll = ScrollController();
+      addTearDown(scroll.dispose);
+
+      Widget build({required bool follow}) => MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            controller: scroll,
+            children: <Widget>[
+              // Enough above the anchor that scrolling moves it without
+              // scrolling it out of the list altogether.
+              const SizedBox(height: 300),
+              SizedBox(
+                key: anchorKey,
+                width: 100,
+                height: 40,
+                child: AnchoredPopover(
+                  autoDismiss: false,
+                  followAnchorOnScroll: follow,
+                  popoverBuilder: (_, _) => content(),
+                  child: const Placeholder(),
+                ),
+              ),
+              const SizedBox(height: 1200),
+            ],
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(build(follow: true));
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(build(follow: false));
+      final double before = tester.getTopLeft(find.byKey(popoverKey)).dy;
+      scroll.jumpTo(100);
+      await tester.pumpAndSettle();
+
+      expect(tester.getTopLeft(find.byKey(popoverKey)).dy, before);
+    });
+
+    testWidgets('followAnchorEveryFrame can be turned on while open', (
+      WidgetTester tester,
+    ) async {
+      final AnchoredPopoverController controller = AnchoredPopoverController();
+      addTearDown(controller.dispose);
+
+      Widget build({required bool everyFrame, required double top}) =>
+          MaterialApp(
+            home: Scaffold(
+              body: Stack(
+                children: <Widget>[
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 400),
+                    left: 100,
+                    top: top,
+                    child: SizedBox(
+                      key: anchorKey,
+                      width: 100,
+                      height: 40,
+                      child: AnchoredPopover(
+                        controller: controller,
+                        trigger: PopoverTrigger.manual,
+                        autoDismiss: false,
+                        followAnchorEveryFrame: everyFrame,
+                        popoverBuilder: (_, _) => content(),
+                        child: const Placeholder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(build(everyFrame: false, top: 100));
+      controller.show();
+      await tester.pumpAndSettle();
+      final double gap =
+          tester.getTopLeft(find.byKey(anchorKey)).dy -
+          tester.getTopLeft(find.byKey(popoverKey)).dy;
+
+      await tester.pumpWidget(build(everyFrame: true, top: 400));
+      for (int i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pumpAndSettle();
+
+      expect(tester.getTopLeft(find.byKey(anchorKey)).dy, 400);
+      expect(400 - tester.getTopLeft(find.byKey(popoverKey)).dy, gap);
     });
   });
 

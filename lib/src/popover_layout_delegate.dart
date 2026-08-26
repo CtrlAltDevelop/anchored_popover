@@ -32,11 +32,11 @@ class PopoverLayoutDelegate extends SingleChildLayoutDelegate {
 
   /// The anchor's bounds, in the coordinate space of the layout's own box.
   ///
-  /// Read through its getter once per layout, so a subclass may override it and
-  /// resolve the rect from a live [RenderBox] instead. That is what keeps a
-  /// popover pinned to an anchor that moves within a frame: a rect measured in
-  /// the build phase describes where the anchor was *before* the frame laid out,
-  /// which is one frame behind while a list is scrolling.
+  /// Measured during the build phase, because it has to be: a render object may
+  /// not read another's size or transform from inside [performLayout], so a
+  /// delegate cannot resolve the anchor live however convenient that would be.
+  /// Keeping a popover on a moving anchor is therefore a matter of rebuilding
+  /// it whenever the anchor moves, which is what [AnchoredPopover] does.
   final Rect anchorRect;
 
   /// The point of [anchorRect] the popover is placed against.

@@ -1,0 +1,9 @@
+tags:
+  # Goldens are rendered images: they differ between Flutter versions and
+  # between platforms, so they are not part of an ordinary `flutter test` run.
+  # Regenerate and check them on one machine, with:
+  #
+  #   flutter test --run-skipped --tags golden --update-goldens
+  #   flutter test --run-skipped --tags golden
+  golden:
+    skip: 'Run with: flutter test --run-skipped --tags golden'

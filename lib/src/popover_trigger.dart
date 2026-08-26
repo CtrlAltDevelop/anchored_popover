@@ -13,6 +13,14 @@ enum PopoverTrigger {
   /// A secondary tap — a right click, or a two-finger trackpad tap.
   secondaryTap,
 
+  /// The pointer resting on the child, for a popover that behaves like a rich
+  /// tooltip.
+  ///
+  /// Adds no gesture recogniser, so the child stays exactly as tappable as it
+  /// was and a touch user — who never hovers — is unaffected. The popover stays
+  /// up while the pointer is on it, so it can hold something to click.
+  hover,
+
   /// Nothing. The popover opens only through its
   /// [AnchoredPopoverController].
   manual,

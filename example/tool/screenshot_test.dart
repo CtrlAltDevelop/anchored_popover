@@ -92,9 +92,7 @@ Future<void> _loadFonts() async {
   if (root == null) {
     fail('FLUTTER_ROOT is unset; run this through `flutter test`.');
   }
-  final Directory fonts = Directory(
-    '$root/bin/cache/artifacts/material_fonts',
-  );
+  final Directory fonts = Directory('$root/bin/cache/artifacts/material_fonts');
   await _load('Roboto', <String>[
     '${fonts.path}/Roboto-Regular.ttf',
     '${fonts.path}/Roboto-Medium.ttf',
@@ -113,9 +111,7 @@ Future<void> _load(String family, List<String> paths) async {
       fail('Missing font ${file.path}.');
     }
     loader.addFont(
-      file.readAsBytes().then(
-        (Uint8List bytes) => ByteData.sublistView(bytes),
-      ),
+      file.readAsBytes().then((Uint8List bytes) => ByteData.sublistView(bytes)),
     );
   }
   await loader.load();

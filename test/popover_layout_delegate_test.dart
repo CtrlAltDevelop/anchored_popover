@@ -75,15 +75,15 @@ void main() {
 
     test('clamps into the padded bounds horizontally', () {
       expect(
-        delegate(anchorRect: const Rect.fromLTWH(0, 280, 100, 40))
-            .getPositionForChild(overlay, const Size(300, 40))
-            .dx,
+        delegate(
+          anchorRect: const Rect.fromLTWH(0, 280, 100, 40),
+        ).getPositionForChild(overlay, const Size(300, 40)).dx,
         8,
       );
       expect(
-        delegate(anchorRect: const Rect.fromLTWH(700, 280, 100, 40))
-            .getPositionForChild(overlay, const Size(300, 40))
-            .dx,
+        delegate(
+          anchorRect: const Rect.fromLTWH(700, 280, 100, 40),
+        ).getPositionForChild(overlay, const Size(300, 40)).dx,
         800 - 8 - 300,
       );
     });

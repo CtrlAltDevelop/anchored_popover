@@ -1,6 +1,67 @@
 # Changelog
 
+## 2.0.0
+
+Keyboard, pointer and focus support, and a popover that follows its anchor
+wherever the anchor goes.
+
+Breaking only in that `PopoverTrigger` gained a value: an exhaustive `switch`
+over it in your own code now needs a `hover` case. Nothing that existed behaves
+differently, and no other API changed.
+
+### Keyboard and focus
+
+- Escape closes an open popover, focused or not (`dismissOnEscape`). Content
+  that wants escape for itself keeps it: while focus is inside the popover the
+  key travels the ordinary `Actions` path and only arrives as a `DismissIntent`
+  nothing else took. Nested popovers close one at a time, innermost first.
+- On Android the system back gesture closes the popover rather than popping the
+  route under it (`dismissOnBackButton`), and stops intercepting the moment the
+  popover starts closing.
+- `autofocus` moves focus into the popover, and `restoreFocus` puts it back on
+  the anchor when the popover closes.
+
+### Pointer
+
+- `PopoverTrigger.hover`, for a popover that behaves like a rich tooltip: it
+  opens once the pointer has rested on the anchor, stays up while the pointer is
+  on the popover itself, and adds no gesture recogniser to the anchor.
+  `hoverEnterDuration` and `hoverExitDuration` tune the delays, on the widget or
+  on `AnchoredPopoverTheme`.
+- The auto-dismiss timer stops while the pointer is over the popover, and
+  restarts when it leaves (`pauseAutoDismissOnHover`).
+- A long press plays the platform's long-press feedback (`enableFeedback`).
+
+### Following the anchor
+
+- Every scrollable the anchor sits inside now moves the popover, not just the
+  innermost one, and a window resize or the software keyboard opening
+  re-anchors it too.
+- `followAnchorEveryFrame` follows an anchor that moves for no reason anything
+  notifies about — one being animated, or dragged in a `ReorderableListView`.
+  It schedules no frames of its own and relayouts only when the anchor has
+  actually moved.
+
+### Everything else
+
+- The scrim is now a `ModalBarrier`, so it carries the platform's localised
+  dismiss action; `barrierSemanticLabel` overrides the label.
+- `AnchoredPopoverTheme` has `==` and `hashCode`, so registering an equal theme
+  no longer counts as a change.
+- Changing `dismissOnEscape`, `autoDismiss`, `showDuration`, `trigger` or
+  `followAnchorEveryFrame` while a popover is open now takes effect on that
+  popover, rather than on the next one to open.
+- The Flutter constraint is relaxed to `>=3.44.0`, verified against that
+  version, and CI builds against both it and the latest stable.
+- Every line of `lib/` is covered by tests, and CI fails if that stops being
+  true.
+- Golden tests for the surface, the scrim, flipping and the entrance
+  transition. They are skipped by an ordinary `flutter test`, because rendering
+  differs between Flutter versions and platforms; run them with
+  `flutter test --run-skipped --tags golden`.
+
 ## 1.0.0
+
 
 Initial stable release.
 

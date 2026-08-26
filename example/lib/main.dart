@@ -81,7 +81,7 @@ class MarketsPage extends StatelessWidget {
                   width: 220,
                   child: Text(
                     'Long press a row for its actions. The popover follows '
-                    'the row as the list scrolls.',
+                    'the row as the list scrolls, and escape closes it.',
                   ),
                 ),
             child: const Padding(
@@ -89,10 +89,26 @@ class MarketsPage extends StatelessWidget {
               child: Icon(Icons.help_outline),
             ),
           ),
-          IconButton(
-            onPressed: onToggleBrightness,
-            icon: const Icon(Icons.brightness_6_outlined),
-            tooltip: 'Toggle brightness',
+          // A hover trigger, for a popover that behaves like a rich tooltip.
+          // It adds no recogniser, so the button underneath stays a button.
+          AnchoredPopover(
+            trigger: PopoverTrigger.hover,
+            autoDismiss: false,
+            targetAnchor: Alignment.bottomCenter,
+            followerAnchor: Alignment.topCenter,
+            offset: const Offset(0, 8),
+            popoverBuilder: (BuildContext context, VoidCallback dismiss) =>
+                const SizedBox(
+                  width: 200,
+                  child: Text(
+                    'Rest the pointer here. The popover stays up while the '
+                    'pointer is on it, so it can hold something to click.',
+                  ),
+                ),
+            child: IconButton(
+              onPressed: onToggleBrightness,
+              icon: const Icon(Icons.brightness_6_outlined),
+            ),
           ),
           const SizedBox(width: 4),
         ],
@@ -132,6 +148,9 @@ class MarketRow extends StatelessWidget {
     final bool up = market.change >= 0;
     return AnchoredPopover(
       semanticLabel: '${market.symbol} actions',
+      // A row of buttons is what the keyboard should move to next, and where
+      // focus should come back from when it closes.
+      autofocus: true,
       popoverBuilder: (BuildContext context, VoidCallback dismiss) => Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
