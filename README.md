@@ -1,5 +1,10 @@
 # anchored_popover
 
+[![pub package](https://img.shields.io/pub/v/anchored_popover.svg)](https://pub.dev/packages/anchored_popover)
+[![pub points](https://img.shields.io/pub/points/anchored_popover)](https://pub.dev/packages/anchored_popover/score)
+[![ci](https://github.com/CtrlAltDevelop/anchored_popover/actions/workflows/ci.yaml/badge.svg)](https://github.com/CtrlAltDevelop/anchored_popover/actions/workflows/ci.yaml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A Flutter popover that anchors to a **widget**, rather than to a screen edge.
 It opens on a long press by default, follows its anchor while the list under it
 scrolls, flips and clamps to stay on screen, and fades itself back out.

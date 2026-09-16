@@ -275,6 +275,10 @@ class AnchoredPopover extends StatefulWidget {
   final VoidCallback? onShow;
 
   /// Called when the popover starts closing, however it was closed.
+  ///
+  /// Not called when the anchor itself is disposed while the popover is up:
+  /// there is no dismissal to report, and half of the tree it would call back
+  /// into is already on its way out.
   final VoidCallback? onDismiss;
 
   @override
@@ -342,7 +346,13 @@ class AnchoredPopoverState extends State<AnchoredPopover>
   /// `pumpAndSettle` from ever settling. An anchor that is animating or being
   /// dragged is already producing frames, and an anchor that is producing no
   /// frames is not moving.
+  /// The callback cannot be removed once added, so it stays registered for the
+  /// life of the app. With nothing open there is nothing to look at, and the
+  /// early return keeps that case from copying a list on every frame forever.
   static void _checkAnchors(Duration timeStamp) {
+    if (_openPopovers.isEmpty) {
+      return;
+    }
     for (final AnchoredPopoverState popover in _openPopovers.toList()) {
       popover._checkAnchor();
     }
