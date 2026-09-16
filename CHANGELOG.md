@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.0
+
+- The per-frame anchor check that `followAnchorEveryFrame` arms returns straight
+  away when no popover is open. The callback it installs is a persistent frame
+  callback, which Flutter cannot remove again, so it outlives every popover that
+  wanted it; it no longer copies a list on every frame for the rest of the app's
+  run to look at nothing.
+- `onDismiss` documents that it is not called when the anchor is disposed while
+  the popover is up. That was always the behaviour — a disposal is not a
+  dismissal, and the callback would fire into a tree already being torn down —
+  but the old wording promised it for every close.
+- The `material_ui` constraint is `>=1.0.0 <2.0.0` rather than `^1.1.0`. The
+  floor is the oldest version the package is tested against, rather than the
+  newest one it happened to be written on, so an app held on an early 1.x can
+  still take it.
+
 ## 2.0.0
 
 Keyboard, pointer and focus support, and a popover that follows its anchor
@@ -64,7 +80,6 @@ differently, and no other API changed.
   `flutter test --run-skipped --tags golden`.
 
 ## 1.0.0
-
 
 Initial stable release.
 
