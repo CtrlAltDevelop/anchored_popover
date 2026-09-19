@@ -2,8 +2,8 @@
 
 [![pub package](https://img.shields.io/pub/v/anchored_popover.svg)](https://pub.dev/packages/anchored_popover)
 [![pub points](https://img.shields.io/pub/points/anchored_popover)](https://pub.dev/packages/anchored_popover/score)
-[![ci](https://github.com/CtrlAltDevelop/anchored_popover/actions/workflows/ci.yaml/badge.svg)](https://github.com/CtrlAltDevelop/anchored_popover/actions/workflows/ci.yaml)
-[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/CtrlAltDevelop/anchored_popover/actions/workflows/ci.yml/badge.svg)](https://github.com/CtrlAltDevelop/anchored_popover/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/CtrlAltDevelop/anchored_popover/blob/main/LICENSE)
 
 A Flutter popover that anchors to a **widget**, rather than to a screen edge.
 It opens on a long press by default, follows its anchor while the list under it
@@ -36,9 +36,26 @@ just above it, and three seconds later it fades away.
 flutter pub add anchored_popover
 ```
 
+Or add it to `pubspec.yaml` yourself — it is a runtime dependency:
+
+```yaml
+dependencies:
+  anchored_popover: ">=2.1.1 <3.0.0"
+  material_ui: ">=1.0.0 <2.0.0"
+```
+
+then:
+
+```bash
+flutter pub get
+```
+
 ```dart
 import 'package:anchored_popover/anchored_popover.dart';
 ```
+
+Requires Flutter 3.44.0 or newer — Dart 3.12.0 — which is `material_ui`'s own
+floor.
 
 ## Features
 

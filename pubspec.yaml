@@ -3,7 +3,7 @@ description: >-
   A popover that anchors to a widget instead of the screen. It follows its
   anchor as the list scrolls, flips and clamps to stay on screen, and fades
   itself back out.
-version: 2.1.0
+version: 2.1.1
 homepage: https://github.com/CtrlAltDevelop/anchored_popover
 repository: https://github.com/CtrlAltDevelop/anchored_popover
 issue_tracker: https://github.com/CtrlAltDevelop/anchored_popover/issues
@@ -24,13 +24,13 @@ screenshots:
     path: doc/screenshot_dark.png
 
 environment:
-  sdk: ">=3.12.0"
+  sdk: ^3.12.0
   flutter: ">=3.44.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  material_ui: '>=1.0.0 <2.0.0'
+  material_ui: ">=1.0.0 <2.0.0"
 
 dev_dependencies:
   flutter_lints: ">=6.0.0 <7.0.0"
