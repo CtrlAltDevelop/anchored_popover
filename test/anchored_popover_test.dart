@@ -1,4 +1,5 @@
 import 'package:anchored_popover/anchored_popover.dart';
+import 'package:anchored_popover/src/widgets/popover_arrow.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -532,6 +533,277 @@ void main() {
     });
   });
 
+  group('transformed anchor', () {
+    testWidgets('a scaled anchor is placed against what is on screen', (
+      WidgetTester tester,
+    ) async {
+      final AnchoredPopoverController controller =
+          AnchoredPopoverController.open();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Transform.scale(
+                scale: 2,
+                child: AnchoredPopover(
+                  trigger: PopoverTrigger.manual,
+                  decorate: false,
+                  autoDismiss: false,
+                  controller: controller,
+                  popoverBuilder: (_, _) => content(),
+                  child: const SizedBox(key: anchorKey, width: 100, height: 40),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final Rect anchor = tester.getRect(find.byKey(anchorKey));
+      final Rect popover = tester.getRect(find.byKey(popoverKey));
+      expect(anchor.width, 200);
+      expect(popover.center.dx, closeTo(anchor.center.dx, 0.01));
+      expect(popover.bottom, closeTo(anchor.top - 8, 0.01));
+    });
+  });
+
+  group('software keyboard', () {
+    testWidgets('a popover is kept clear of the keyboard', (
+      WidgetTester tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 600);
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.reset);
+      final AnchoredPopoverController controller = AnchoredPopoverController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            resizeToAvoidBottomInset: false,
+            body: Align(
+              alignment: Alignment.bottomCenter,
+              child: AnchoredPopover(
+                controller: controller,
+                trigger: PopoverTrigger.manual,
+                decorate: false,
+                autoDismiss: false,
+                targetAnchor: Alignment.bottomCenter,
+                followerAnchor: Alignment.topCenter,
+                offset: const Offset(0, 8),
+                popoverBuilder: (_, _) => content(),
+                child: const SizedBox(key: anchorKey, width: 100, height: 40),
+              ),
+            ),
+          ),
+        ),
+      );
+      controller.show();
+      await tester.pumpAndSettle();
+
+      // Keyboard top is at 300; the default screen padding of 8 sits above it.
+      expect(tester.getRect(find.byKey(popoverKey)).bottom, 300 - 8);
+    });
+  });
+
+  group('arrow', () {
+    Widget arrowHost({
+      Alignment alignment = Alignment.center,
+      bool showArrow = true,
+      bool decorate = true,
+      AlignmentGeometry targetAnchor = Alignment.topCenter,
+      AlignmentGeometry followerAnchor = Alignment.bottomCenter,
+      Offset offset = const Offset(0, -8),
+    }) => host(
+      AnchoredPopover(
+        controller: AnchoredPopoverController.open(),
+        trigger: PopoverTrigger.manual,
+        autoDismiss: false,
+        showArrow: showArrow,
+        decorate: decorate,
+        targetAnchor: targetAnchor,
+        followerAnchor: followerAnchor,
+        offset: offset,
+        popoverBuilder: (_, _) => content(),
+        child: const Placeholder(),
+      ),
+      alignment: alignment,
+    );
+
+    Finder arrows() => find.byType(PopoverArrow);
+
+    /// The arrows that were given a size — at most one is.
+    List<RenderBox> drawn(WidgetTester tester) => tester
+        .renderObjectList<RenderBox>(find.byType(CustomPaint))
+        .where(
+          (RenderBox box) =>
+              box.hasSize && !box.size.isEmpty && box.size.width == 14,
+        )
+        .toList();
+
+    testWidgets('points down from a popover that sits above the anchor', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(arrowHost());
+      await tester.pumpAndSettle();
+
+      expect(arrows(), findsNWidgets(2));
+      final List<RenderBox> shown = drawn(tester);
+      expect(shown, hasLength(1));
+
+      final Rect anchor = tester.getRect(find.byKey(anchorKey));
+      final Rect arrow =
+          shown.single.localToGlobal(Offset.zero) & shown.single.size;
+      // Centred on the anchor, tip a plug's width short of its top edge.
+      expect(arrow.center.dx, closeTo(anchor.center.dx, 0.01));
+      expect(arrow.bottom, closeTo(anchor.top - 1, 1.01));
+      expect(arrow.size.height, 8);
+    });
+
+    testWidgets('points up from a popover that sits below the anchor', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        arrowHost(
+          targetAnchor: Alignment.bottomCenter,
+          followerAnchor: Alignment.topCenter,
+          offset: const Offset(0, 8),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final List<RenderBox> shown = drawn(tester);
+      expect(shown, hasLength(1));
+      final Rect anchor = tester.getRect(find.byKey(anchorKey));
+      final Rect arrow =
+          shown.single.localToGlobal(Offset.zero) & shown.single.size;
+      expect(arrow.top, closeTo(anchor.bottom + 1, 1.01));
+    });
+
+    testWidgets('stays clear of the popover corner when the anchor is at the '
+        'edge', (WidgetTester tester) async {
+      await tester.pumpWidget(arrowHost(alignment: Alignment.centerLeft));
+      await tester.pumpAndSettle();
+
+      final RenderBox arrow = drawn(tester).single;
+      final Rect surface = tester.getRect(find.byType(PopoverSurface));
+      final double left = arrow.localToGlobal(Offset.zero).dx;
+      expect(left, greaterThanOrEqualTo(surface.left + 12));
+    });
+
+    testWidgets('is absent when the popover sits beside the anchor', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        arrowHost(
+          targetAnchor: Alignment.centerRight,
+          followerAnchor: Alignment.centerLeft,
+          offset: const Offset(8, 0),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(drawn(tester), isEmpty);
+    });
+
+    testWidgets('is not built unless asked for, or without a surface', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(arrowHost(showArrow: false));
+      await tester.pumpAndSettle();
+      expect(arrows(), findsNothing);
+
+      await tester.pumpWidget(arrowHost(decorate: false));
+      await tester.pumpAndSettle();
+      expect(arrows(), findsNothing);
+    });
+
+    testWidgets('takes its size from the theme', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(
+            extensions: const <ThemeExtension<dynamic>>[
+              AnchoredPopoverTheme(arrowSize: Size(20, 10)),
+            ],
+          ),
+          home: Scaffold(
+            body: Center(
+              child: AnchoredPopover(
+                controller: AnchoredPopoverController.open(),
+                trigger: PopoverTrigger.manual,
+                autoDismiss: false,
+                showArrow: true,
+                popoverBuilder: (_, _) => content(),
+                child: const SizedBox(key: anchorKey, width: 100, height: 40),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final Iterable<Size> sizes = tester
+          .renderObjectList<RenderBox>(find.byType(CustomPaint))
+          .where((RenderBox box) => box.size.width == 20)
+          .map((RenderBox box) => box.size);
+      expect(sizes.single, const Size(20, 11));
+    });
+  });
+
+  group('transitionBuilder', () {
+    testWidgets('replaces the fade and scale', (WidgetTester tester) async {
+      Animation<double>? seen;
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            decorate: false,
+            autoDismiss: false,
+            transitionBuilder:
+                (
+                  BuildContext context,
+                  Animation<double> animation,
+                  Widget child,
+                ) {
+                  seen = animation;
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 1),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  );
+                },
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(popoverKey), findsOneWidget);
+      expect(seen!.value, 1);
+      expect(
+        find.ancestor(
+          of: find.byKey(popoverKey),
+          matching: find.byType(SlideTransition),
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(popoverKey),
+          matching: find.byType(ScaleTransition),
+        ),
+        findsNothing,
+      );
+    });
+  });
+
   group('scrolling', () {
     Widget list(ScrollController controller, {required Widget popover}) =>
         MaterialApp(
@@ -661,6 +933,76 @@ void main() {
     });
   });
 
+  group('anchor out of view', () {
+    // A SingleChildScrollView builds everything, so the anchor stays mounted
+    // when it scrolls away — which is when a popover would be left behind.
+    Widget scroller(
+      ScrollController controller,
+      AnchoredPopoverController popover,
+    ) => MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          controller: controller,
+          child: Column(
+            children: <Widget>[
+              const SizedBox(height: 300),
+              AnchoredPopover(
+                controller: popover,
+                trigger: PopoverTrigger.manual,
+                autoDismiss: false,
+                popoverBuilder: (_, _) => content(),
+                child: const SizedBox(key: anchorKey, width: 100, height: 40),
+              ),
+              const SizedBox(height: 3000),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('scrolling the anchor out of the viewport closes it', (
+      WidgetTester tester,
+    ) async {
+      final ScrollController scroll = ScrollController();
+      final AnchoredPopoverController popover = AnchoredPopoverController();
+      addTearDown(scroll.dispose);
+      addTearDown(popover.dispose);
+      int dismissed = 0;
+
+      await tester.pumpWidget(scroller(scroll, popover));
+      popover.show();
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+      popover.addListener(() => dismissed += popover.isOpen ? 0 : 1);
+
+      scroll.jumpTo(1500);
+      await tester.pumpAndSettle();
+      expect(popover.isOpen, isFalse);
+      expect(dismissed, 1);
+      expect(find.byKey(popoverKey), findsNothing);
+    });
+
+    testWidgets('an anchor that is partly in view keeps it open', (
+      WidgetTester tester,
+    ) async {
+      final ScrollController scroll = ScrollController();
+      final AnchoredPopoverController popover = AnchoredPopoverController();
+      addTearDown(scroll.dispose);
+      addTearDown(popover.dispose);
+
+      await tester.pumpWidget(scroller(scroll, popover));
+      popover.show();
+      await tester.pumpAndSettle();
+
+      // The anchor spans 300..340 of the content; this leaves 10px of it under
+      // the top edge of the viewport.
+      scroll.jumpTo(330);
+      await tester.pumpAndSettle();
+      expect(popover.isOpen, isTrue);
+      expect(find.byKey(popoverKey), findsOneWidget);
+    });
+  });
+
   group('lifecycle', () {
     testWidgets('the anchor leaving the tree while open throws nothing', (
       WidgetTester tester,
@@ -683,6 +1025,36 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
       await tester.pumpAndSettle();
       expect(find.byKey(popoverKey), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the controller reads closed once the anchor is gone', (
+      WidgetTester tester,
+    ) async {
+      final AnchoredPopoverController controller = AnchoredPopoverController();
+      addTearDown(controller.dispose);
+      int notified = 0;
+      controller.addListener(() => notified++);
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            controller: controller,
+            autoDismiss: false,
+            popoverBuilder: (_, _) => content(),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      controller.show();
+      await tester.pumpAndSettle();
+      expect(controller.isOpen, isTrue);
+      final int before = notified;
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      await tester.pumpAndSettle();
+      expect(controller.isOpen, isFalse);
+      expect(notified, before);
       expect(tester.takeException(), isNull);
     });
 
@@ -785,6 +1157,41 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(find.byKey(popoverKey), findsOneWidget);
+    });
+
+    testWidgets('a nested popover that ignores escape leaves it to the outer '
+        'one', (WidgetTester tester) async {
+      final AnchoredPopoverController outer = AnchoredPopoverController();
+      final AnchoredPopoverController inner = AnchoredPopoverController();
+      addTearDown(outer.dispose);
+      addTearDown(inner.dispose);
+
+      await tester.pumpWidget(
+        host(
+          AnchoredPopover(
+            controller: outer,
+            trigger: PopoverTrigger.manual,
+            autoDismiss: false,
+            popoverBuilder: (_, _) => AnchoredPopover(
+              controller: inner,
+              trigger: PopoverTrigger.manual,
+              autoDismiss: false,
+              dismissOnEscape: false,
+              popoverBuilder: (_, _) => const SizedBox(width: 20, height: 20),
+              child: content(),
+            ),
+            child: const Placeholder(),
+          ),
+        ),
+      );
+      outer.show();
+      await tester.pumpAndSettle();
+      inner.show();
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(outer.isOpen, isFalse);
     });
 
     testWidgets('escape stops being handled once the anchor is gone', (
@@ -1085,6 +1492,57 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.text('open'), findsOneWidget);
+    });
+
+    testWidgets('on iOS the route keeps its swipe-back gesture', (
+      WidgetTester tester,
+    ) async {
+      late BuildContext pageContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.iOS),
+          home: Scaffold(
+            body: Builder(
+              builder: (BuildContext context) => Center(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) {
+                        pageContext = context;
+                        return Scaffold(
+                          body: Center(
+                            child: SizedBox(
+                              key: anchorKey,
+                              width: 100,
+                              height: 40,
+                              child: AnchoredPopover(
+                                autoDismiss: false,
+                                popoverBuilder: (_, _) => content(),
+                                child: const Placeholder(),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.byKey(anchorKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(popoverKey), findsOneWidget);
+
+      expect(
+        ModalRoute.of(pageContext)!.popDisposition,
+        RoutePopDisposition.pop,
+      );
     });
   });
 

@@ -21,7 +21,10 @@ import 'package:material_ui/material_ui.dart';
 /// The controller holds the open/closed state, so it survives the popover being
 /// rebuilt, and reads back correctly the moment [show] returns rather than a
 /// frame later. Auto-dismiss and tap-outside go through it as well, which means
-/// [isOpen] is never out of step with what is on screen.
+/// [isOpen] is never out of step with what is on screen. That includes the
+/// popover's anchor being removed from the tree while it is up: the controller
+/// reads closed from then on, without notifying its listeners — they would be
+/// called in the middle of the tree being torn down.
 ///
 /// Dispose it with the [State] that owns it. An [AnchoredPopover] never disposes
 /// a controller it was given; one it created for itself it does.
@@ -66,4 +69,12 @@ class AnchoredPopoverController extends ChangeNotifier {
 
   /// [hide] when open, [show] when not.
   void toggle() => _isOpen ? hide() : show();
+}
+
+/// Marks [controller] closed without notifying its listeners.
+///
+/// For [AnchoredPopover] to call when its anchor is disposed with the popover
+/// up, a moment at which listeners cannot safely run. Not exported.
+void closeWithoutNotifying(AnchoredPopoverController controller) {
+  controller._isOpen = false;
 }

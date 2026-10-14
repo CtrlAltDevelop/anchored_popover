@@ -12,6 +12,7 @@ const AnchoredPopoverTheme filled = AnchoredPopoverTheme(
   shadows: <BoxShadow>[BoxShadow(blurRadius: 33)],
   textStyle: TextStyle(fontSize: 41),
   screenPadding: EdgeInsets.all(51),
+  arrowSize: Size(23, 11),
   showDuration: Duration(seconds: 61),
   transitionDuration: Duration(milliseconds: 71),
   reverseTransitionDuration: Duration(milliseconds: 81),
@@ -36,6 +37,7 @@ void main() {
       expect(theme.shadows, isNotNull);
       expect(theme.textStyle, isNotNull);
       expect(theme.screenPadding, isNotNull);
+      expect(theme.arrowSize, const Size(14, 7));
       expect(theme.showDuration, const Duration(seconds: 3));
       expect(theme.transitionDuration, const Duration(milliseconds: 120));
       expect(theme.reverseTransitionDuration, const Duration(milliseconds: 90));
@@ -60,6 +62,7 @@ void main() {
       expect(theme.shadows, filled.shadows);
       expect(theme.textStyle, filled.textStyle);
       expect(theme.screenPadding, filled.screenPadding);
+      expect(theme.arrowSize, filled.arrowSize);
       expect(theme.showDuration, filled.showDuration);
       expect(theme.transitionDuration, filled.transitionDuration);
       expect(theme.reverseTransitionDuration, filled.reverseTransitionDuration);
@@ -88,6 +91,7 @@ void main() {
         shadows: filled.shadows,
         textStyle: filled.textStyle,
         screenPadding: filled.screenPadding,
+        arrowSize: filled.arrowSize,
         showDuration: filled.showDuration,
         transitionDuration: filled.transitionDuration,
         reverseTransitionDuration: filled.reverseTransitionDuration,
@@ -105,6 +109,7 @@ void main() {
       expect(theme.shadows, filled.shadows);
       expect(theme.textStyle, filled.textStyle);
       expect(theme.screenPadding, filled.screenPadding);
+      expect(theme.arrowSize, filled.arrowSize);
       expect(theme.showDuration, filled.showDuration);
       expect(theme.transitionDuration, filled.transitionDuration);
       expect(theme.reverseTransitionDuration, filled.reverseTransitionDuration);
@@ -125,6 +130,7 @@ void main() {
       expect(theme.shadows, filled.shadows);
       expect(theme.textStyle, filled.textStyle);
       expect(theme.screenPadding, filled.screenPadding);
+      expect(theme.arrowSize, filled.arrowSize);
       expect(theme.showDuration, filled.showDuration);
       expect(theme.transitionDuration, filled.transitionDuration);
       expect(theme.reverseTransitionDuration, filled.reverseTransitionDuration);
@@ -155,6 +161,7 @@ void main() {
       shadows: <BoxShadow>[BoxShadow(blurRadius: 3)],
       textStyle: TextStyle(fontSize: 1),
       screenPadding: EdgeInsets.all(1),
+      arrowSize: Size(1, 1),
       showDuration: Duration(seconds: 1),
       transitionDuration: Duration(milliseconds: 1),
       reverseTransitionDuration: Duration(milliseconds: 1),
@@ -197,6 +204,7 @@ void main() {
         BorderRadius.lerp(filled.borderRadius, other.borderRadius, 0.5),
       );
       expect(theme.screenPadding, const EdgeInsets.all(26));
+      expect(theme.arrowSize, const Size(12, 6));
       expect(theme.borderSide!.width, 8);
       expect(theme.shadows!.single.blurRadius, 18);
       expect(theme.textStyle!.fontSize, 21);

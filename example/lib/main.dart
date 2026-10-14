@@ -73,6 +73,8 @@ class MarketsPage extends StatelessWidget {
           AnchoredPopover(
             trigger: PopoverTrigger.tap,
             autoDismiss: false,
+            // An arrow from the surface to the anchor.
+            showArrow: true,
             targetAnchor: Alignment.bottomRight,
             followerAnchor: Alignment.topRight,
             offset: const Offset(0, 8),

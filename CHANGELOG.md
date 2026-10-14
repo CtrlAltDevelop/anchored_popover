@@ -1,5 +1,44 @@
 # Changelog
 
+## 2.2.0
+
+An arrow, a replaceable transition, and a round of fixes to how a popover
+behaves when its anchor goes away or moves somewhere unusual.
+
+### Added
+
+- `showArrow` draws an arrow from the surface to the anchor, in the surface's
+  colour and border. It sits on whichever edge faces the anchor after any flip,
+  is centred on `targetAnchor`, and keeps clear of the corners. There is none
+  when the popover sits beside the anchor. Off by default.
+- `AnchoredPopoverTheme.arrowSize` sets the arrow's width and height, 14 × 7 by
+  default.
+- `transitionBuilder` replaces the default fade and scale with a transition of
+  your own. It is given the animation, already running through the popover's
+  durations and curves.
+
+### Fixed
+
+- A popover no longer stays behind, pinned to the edge of the screen, when its
+  anchor is scrolled out of view. It closes once the anchor is entirely outside
+  the overlay or any scrollable it sits in; an anchor that is only partly
+  visible keeps it open.
+- Escape reaches the innermost popover that handles it. A nested popover with
+  `dismissOnEscape: false` no longer swallows the key for the popover it was
+  opened from.
+- `AnchoredPopoverController.isOpen` reads closed once the anchor has been
+  removed from the tree, as its documentation always said it would. Listeners
+  are not notified: they would run in the middle of the tree being torn down.
+  A new anchor given the same controller no longer opens straight away.
+- A scaled or rotated anchor — in a `Transform`, or mid-`Hero` flight — is
+  placed against its bounds on screen rather than against its unscaled box.
+- A popover is kept clear of the software keyboard: `viewInsets.bottom` is added
+  to the clamp padding, which the keyboard had been emptying out of
+  `MediaQuery.padding`.
+- `dismissOnBackButton` is not applied on iOS and macOS. Putting a pop in the
+  way of a route also disabled its swipe-back gesture for as long as the
+  popover was up. Android and the other platforms are unchanged.
+
 ## 2.1.1
 
 - No change to the published code. CI moved to the shared reusable workflow in

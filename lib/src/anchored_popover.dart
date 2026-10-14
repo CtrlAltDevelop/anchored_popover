@@ -8,6 +8,7 @@ import 'anchored_popover_controller.dart';
 import 'anchored_popover_theme.dart';
 import 'popover_layout_delegate.dart';
 import 'popover_trigger.dart';
+import 'widgets/popover_arrow.dart';
 import 'widgets/popover_surface.dart';
 
 /// Builds the content of a popover.
@@ -16,6 +17,18 @@ import 'widgets/popover_surface.dart';
 /// inside it usually wants to do once it has run.
 typedef PopoverBuilder =
     Widget Function(BuildContext context, VoidCallback dismiss);
+
+/// Wraps the popover's content in its own entrance and exit transition.
+///
+/// [animation] runs from 0 to 1 as the popover opens and back to 0 as it
+/// closes, through the popover's curves; [child] is the content, on its surface.
+/// The popover is removed once [animation] has reached 0 again.
+typedef PopoverTransitionBuilder =
+    Widget Function(
+      BuildContext context,
+      Animation<double> animation,
+      Widget child,
+    );
 
 /// Shows a popover anchored to [child] rather than to the screen.
 ///
@@ -69,11 +82,13 @@ class AnchoredPopover extends StatefulWidget {
     this.barrierColor,
     this.barrierSemanticLabel,
     this.decorate = true,
+    this.showArrow = false,
     this.screenPadding,
     this.transitionDuration,
     this.reverseTransitionDuration,
     this.curve,
     this.reverseCurve,
+    this.transitionBuilder,
     this.dismissOnEscape = true,
     this.dismissOnBackButton = true,
     this.autofocus = false,
@@ -189,8 +204,20 @@ class AnchoredPopover extends StatefulWidget {
   /// transparent [Material] so text styles and ink respond normally.
   final bool decorate;
 
+  /// Whether the surface grows an arrow pointing at the anchor.
+  ///
+  /// Drawn on the edge of the popover that faces the anchor, at the point of
+  /// [targetAnchor] and kept clear of the corners. It is the surface's colour
+  /// and border, sized by [AnchoredPopoverTheme.arrowSize], and there is none
+  /// when the popover sits beside the anchor rather than above or below it.
+  ///
+  /// Needs [decorate], and room: the arrow lies in the gap [offset] leaves
+  /// between the two, so [offset] should be at least the arrow's height — the
+  /// default is.
+  final bool showArrow;
+
   /// How close to the edge of the [Overlay] the popover may be placed, on top of
-  /// the safe-area insets.
+  /// the safe-area insets and the software keyboard.
   ///
   /// Defaults to [AnchoredPopoverTheme.screenPadding], then to 8 on all sides.
   final EdgeInsetsGeometry? screenPadding;
@@ -207,6 +234,13 @@ class AnchoredPopover extends StatefulWidget {
   /// Curve of the exit transition.
   final Curve? reverseCurve;
 
+  /// Replaces the default fade and scale with a transition of your own.
+  ///
+  /// The default grows the popover out of [followerAnchor] while it fades in.
+  /// Durations and curves still apply, through the animation the builder is
+  /// given.
+  final PopoverTransitionBuilder? transitionBuilder;
+
   /// Whether pressing escape closes the popover.
   ///
   /// Works whether or not anything inside the popover has focus, so a popover
@@ -221,8 +255,9 @@ class AnchoredPopover extends StatefulWidget {
   /// Whether the system back gesture or button closes the popover instead of
   /// popping the route under it.
   ///
-  /// Only intercepts while the popover is open, and only reaches Android's back
-  /// gesture; there is nothing to intercept on the other platforms.
+  /// Only intercepts while the popover is open. Not applied on iOS and macOS:
+  /// there is no back button to intercept, and a route with a pop in the way
+  /// loses its swipe-back gesture while the popover is up.
   final bool dismissOnBackButton;
 
   /// Whether opening the popover moves focus into it.
@@ -457,6 +492,12 @@ class AnchoredPopoverState extends State<AnchoredPopover>
     _detachEscapeHandler();
     _detachAnchorListeners();
     _controller.removeListener(_handleControllerChanged);
+    if (widget.controller != null) {
+      // The popover is gone with its anchor, so the controller must not go on
+      // saying it is open — a new anchor given this controller would otherwise
+      // open straight away.
+      closeWithoutNotifying(widget.controller!);
+    }
     _openPopovers.remove(this);
     _intercepting.dispose();
     _focusScope.dispose();
@@ -575,8 +616,14 @@ class AnchoredPopoverState extends State<AnchoredPopover>
       return false;
     }
     // Escape is the innermost popover's to take. Without this, opening a
-    // popover from inside another would close both on one press.
-    if (_openPopovers.isNotEmpty && _openPopovers.last != this) {
+    // popover from inside another would close both on one press. A popover
+    // that has opted out of escape does not count as innermost, or it would
+    // swallow the key for the one it was opened from.
+    final AnchoredPopoverState innermost = _openPopovers.lastWhere(
+      (AnchoredPopoverState popover) => popover.widget.dismissOnEscape,
+      orElse: () => this,
+    );
+    if (innermost != this) {
       return false;
     }
     // Focus is inside the popover, so the key has somewhere ordinary to go: a
@@ -721,7 +768,51 @@ class AnchoredPopoverState extends State<AnchoredPopover>
       return;
     }
     _lastAnchorRect = rect;
+    if (_anchorOutOfView()) {
+      _controller.hide();
+      return;
+    }
     _anchorRevision.value++;
+  }
+
+  /// Whether the anchor has been scrolled, or moved, entirely out of sight: out
+  /// of the overlay, or out of any scrollable it sits inside.
+  ///
+  /// A popover left behind would be clamped to the edge of the screen, pointing
+  /// at nothing. An anchor that is only partly visible still counts as in view,
+  /// and one that is not measured yet is never out of it.
+  bool _anchorOutOfView() {
+    final RenderObject? anchor = context.findRenderObject();
+    if (anchor is! RenderBox || !anchor.attached || !anchor.hasSize) {
+      return false;
+    }
+    final List<RenderObject?> clips = <RenderObject?>[
+      Overlay.maybeOf(context)?.context.findRenderObject(),
+    ];
+    context.visitAncestorElements((Element element) {
+      if (element is StatefulElement && element.state is ScrollableState) {
+        clips.add(element.renderObject);
+      }
+      return true;
+    });
+    for (final RenderObject? clip in clips) {
+      if (clip is! RenderBox || !clip.attached || !clip.hasSize) {
+        continue;
+      }
+      final Rect rect = MatrixUtils.transformRect(
+        anchor.getTransformTo(clip),
+        Offset.zero & anchor.size,
+      );
+      // Inclusive, so an anchor that is merely touching the edge, or has no
+      // area, is not mistaken for one that has left.
+      if (rect.left > clip.size.width ||
+          rect.right < 0 ||
+          rect.top > clip.size.height ||
+          rect.bottom < 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// The anchor's bounds in the overlay's coordinate space, or null while
@@ -739,8 +830,19 @@ class AnchoredPopoverState extends State<AnchoredPopover>
         !overlay.hasSize) {
       return null;
     }
-    return anchor.localToGlobal(Offset.zero, ancestor: overlay) & anchor.size;
+    return _boundsIn(anchor, overlay);
   }
+
+  /// [anchor]'s bounds in [overlay]'s coordinate space.
+  ///
+  /// Through the whole transform between them, so an anchor that is scaled or
+  /// rotated — in a [Transform], or mid-[Hero] flight — is placed against what
+  /// is on screen rather than against its unscaled box.
+  static Rect _boundsIn(RenderBox anchor, RenderBox overlay) =>
+      MatrixUtils.transformRect(
+        anchor.getTransformTo(overlay),
+        Offset.zero & anchor.size,
+      );
 
   @override
   void didChangeMetrics() {
@@ -765,9 +867,14 @@ class AnchoredPopoverState extends State<AnchoredPopover>
     _anchorRefreshQueued = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _anchorRefreshQueued = false;
-      if (mounted && _visible) {
-        _anchorRevision.value++;
+      if (!mounted || !_visible) {
+        return;
       }
+      if (_anchorOutOfView()) {
+        _controller.hide();
+        return;
+      }
+      _anchorRevision.value++;
     });
   }
 
@@ -828,21 +935,28 @@ class AnchoredPopoverState extends State<AnchoredPopover>
 
   Widget _buildPopover(BuildContext context) {
     final OverlayState overlay = Overlay.of(this.context);
-    final RenderBox? anchorBox = this.context.findRenderObject() as RenderBox?;
-    final RenderBox? overlayBox =
-        overlay.context.findRenderObject() as RenderBox?;
-    if (anchorBox == null ||
+    // Checked the way _resolveAnchorRect checks it, so the two cannot disagree
+    // about whether there is an anchor to place against.
+    final RenderObject? anchorBox = this.context.findRenderObject();
+    final RenderObject? overlayBox = overlay.context.findRenderObject();
+    if (anchorBox is! RenderBox ||
         !anchorBox.hasSize ||
-        overlayBox == null ||
+        overlayBox is! RenderBox ||
         !overlayBox.hasSize) {
       return const SizedBox.shrink();
     }
 
     final AnchoredPopoverTheme theme = AnchoredPopoverTheme.resolve(context);
     final TextDirection direction = Directionality.of(context);
+    // The keyboard is not part of MediaQuery.padding — it takes the bottom
+    // inset away from it — so it is added back: a popover must not be placed
+    // where the keyboard is. Whichever of the two is larger wins, as it should.
     final EdgeInsets screenPadding =
         (widget.screenPadding ?? theme.screenPadding!).resolve(direction) +
-        MediaQuery.paddingOf(overlay.context);
+        MediaQuery.paddingOf(overlay.context) +
+        EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(overlay.context).bottom,
+        );
 
     Widget content = widget.popoverBuilder(context, hide);
     content = widget.decorate
@@ -884,31 +998,51 @@ class AnchoredPopoverState extends State<AnchoredPopover>
         child: content,
       );
     }
-    content = FadeTransition(
-      opacity: _entrance,
-      child: ScaleTransition(
-        scale: _entrance,
-        alignment: widget.followerAnchor.resolve(direction),
-        child: content,
-      ),
-    );
+    content =
+        widget.transitionBuilder?.call(context, _entrance, content) ??
+        FadeTransition(
+          opacity: _entrance,
+          child: ScaleTransition(
+            scale: _entrance,
+            alignment: widget.followerAnchor.resolve(direction),
+            child: content,
+          ),
+        );
+    final bool arrow = widget.showArrow && widget.decorate;
 
     final Widget positioned = ValueListenableBuilder<int>(
       valueListenable: _anchorRevision,
       child: content,
       builder: (BuildContext context, int revision, Widget? child) {
-        return CustomSingleChildLayout(
-          delegate: PopoverLayoutDelegate(
-            anchorRect:
-                anchorBox.localToGlobal(Offset.zero, ancestor: overlayBox) &
-                anchorBox.size,
-            targetAnchor: widget.targetAnchor.resolve(direction),
-            followerAnchor: widget.followerAnchor.resolve(direction),
-            offset: widget.offset,
-            screenPadding: screenPadding,
-            flip: widget.flip,
+        final PopoverLayoutDelegate placement = PopoverLayoutDelegate(
+          anchorRect: _boundsIn(anchorBox, overlayBox),
+          targetAnchor: widget.targetAnchor.resolve(direction),
+          followerAnchor: widget.followerAnchor.resolve(direction),
+          offset: widget.offset,
+          screenPadding: screenPadding,
+          flip: widget.flip,
+        );
+        if (!arrow) {
+          return CustomSingleChildLayout(delegate: placement, child: child);
+        }
+        Widget arrowFor(bool pointsUp) => FadeTransition(
+          opacity: _entrance,
+          child: PopoverArrow(
+            pointsUp: pointsUp,
+            color: theme.backgroundColor!,
+            borderSide: theme.borderSide!,
           ),
-          child: child,
+        );
+        return CustomMultiChildLayout(
+          delegate: PopoverArrowLayoutDelegate(
+            placement: placement,
+            arrowSize: theme.arrowSize!,
+          ),
+          children: <Widget>[
+            LayoutId(id: PopoverArrowSlot.content, child: child!),
+            LayoutId(id: PopoverArrowSlot.up, child: arrowFor(true)),
+            LayoutId(id: PopoverArrowSlot.down, child: arrowFor(false)),
+          ],
         );
       },
     );
@@ -950,7 +1084,13 @@ class AnchoredPopoverState extends State<AnchoredPopover>
   /// Puts the popover in the way of a route pop, so back closes the popover
   /// rather than the page under it.
   Widget _withBackButton(Widget child) {
-    if (!widget.dismissOnBackButton) {
+    // Not on the platforms whose routes swipe back: a route with something
+    // in the way of its pop loses that gesture entirely, for as long as the
+    // popover is up.
+    final TargetPlatform platform = Theme.of(context).platform;
+    if (!widget.dismissOnBackButton ||
+        platform == TargetPlatform.iOS ||
+        platform == TargetPlatform.macOS) {
       return child;
     }
     return ValueListenableBuilder<bool>(

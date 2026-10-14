@@ -14,7 +14,7 @@
 library;
 
 export 'src/anchored_popover.dart';
-export 'src/anchored_popover_controller.dart';
+export 'src/anchored_popover_controller.dart' show AnchoredPopoverController;
 export 'src/anchored_popover_theme.dart';
 export 'src/popover_layout_delegate.dart';
 export 'src/popover_trigger.dart';

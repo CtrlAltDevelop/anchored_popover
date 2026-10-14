@@ -40,7 +40,7 @@ Or add it to `pubspec.yaml` yourself — it is a runtime dependency:
 
 ```yaml
 dependencies:
-  anchored_popover: ">=2.1.1 <3.0.0"
+  anchored_popover: ">=2.2.0 <3.0.0"
   material_ui: ">=1.0.0 <2.0.0"
 ```
 
@@ -65,6 +65,7 @@ floor.
 - A controller and a `GlobalKey` state API for imperative use.
 - Screen-safe placement, with vertical flipping and edge clamping.
 - Anchor following inside a scrollable — or dismissal on scroll, if you prefer.
+- An optional arrow pointing at the anchor, and a transition you can replace.
 - A theme extension, plus a reusable `PopoverSurface`.
 - Directionality, ambient theme, localisation, and accessibility support.
 
@@ -169,6 +170,40 @@ going to happen anyway, which is all an animation or a drag produces — and
 relayouts only when the anchor has actually moved. It is off by default because
 most anchors only ever move for a reason the default already covers.
 
+## Arrow and transition
+
+`showArrow: true` grows an arrow from the surface to the anchor — on whichever
+edge faces it after any flip, centred on the `targetAnchor` point and kept clear
+of the corners. It takes the surface's colour and border, and its size comes
+from `AnchoredPopoverTheme.arrowSize` (14 × 7 by default). The arrow lies in the
+gap `offset` leaves, so keep that at least as tall as the arrow; the default is.
+There is no arrow when the popover sits beside the anchor rather than above or
+below it.
+
+```dart
+AnchoredPopover(
+  showArrow: true,
+  popoverBuilder: (context, dismiss) => const Text('Pointing at you'),
+  child: const Icon(Icons.info_outline),
+)
+```
+
+`transitionBuilder` replaces the default fade and scale with your own. It is
+handed the animation — already running through the popover's durations and
+curves — and the content:
+
+```dart
+AnchoredPopover(
+  transitionBuilder: (context, animation, child) => SlideTransition(
+    position: Tween(begin: const Offset(0, 0.2), end: Offset.zero)
+        .animate(animation),
+    child: FadeTransition(opacity: animation, child: child),
+  ),
+  popoverBuilder: (context, dismiss) => const Text('Slides in'),
+  child: const Icon(Icons.info_outline),
+)
+```
+
 ## Theming
 
 Register an `AnchoredPopoverTheme` on `ThemeData.extensions` to set defaults for
@@ -224,10 +259,12 @@ so text styles and ink respond normally.
 | `hoverEnterDuration` | 300 ms | Rest before a `hover` popover opens. |
 | `hoverExitDuration` | 100 ms | Grace after the pointer leaves both anchor and popover. |
 | `decorate` | `true` | Whether to wrap the content in a `PopoverSurface`. |
+| `showArrow` | `false` | Whether the surface grows an arrow pointing at the anchor. |
 | `screenPadding` | `EdgeInsets.all(8)` | How close to the overlay's edge it may sit. |
 | `transitionDuration` | 120 ms | Fade and scale in. |
 | `reverseTransitionDuration` | 90 ms | Fade and scale out. |
 | `curve` / `reverseCurve` | `easeOutCubic` / `easeIn` | Transition curves. |
+| `transitionBuilder` | fade and scale | Replaces the entrance and exit transition. |
 | `semanticLabel` | none | Announced by screen readers when it opens. |
 | `onShow` / `onDismiss` | none | Called when it opens and when it starts closing. |
 

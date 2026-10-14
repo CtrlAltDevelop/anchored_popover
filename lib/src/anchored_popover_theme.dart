@@ -30,6 +30,7 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
     this.shadows,
     this.textStyle,
     this.screenPadding,
+    this.arrowSize,
     this.showDuration,
     this.transitionDuration,
     this.reverseTransitionDuration,
@@ -65,6 +66,10 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
   /// Added to the safe-area insets, and enforced by clamping — see
   /// [PopoverLayoutDelegate].
   final EdgeInsetsGeometry? screenPadding;
+
+  /// Width and height of the arrow a popover built with `showArrow` draws, from
+  /// its base to its tip.
+  final Size? arrowSize;
 
   /// How long a popover stays up before it dismisses itself.
   ///
@@ -138,6 +143,7 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
             fontWeight: FontWeight.w500,
           ),
       screenPadding: screenPadding ?? const EdgeInsets.all(8),
+      arrowSize: arrowSize ?? const Size(14, 7),
       showDuration: showDuration ?? const Duration(seconds: 3),
       transitionDuration:
           transitionDuration ?? const Duration(milliseconds: 120),
@@ -161,6 +167,7 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
     List<BoxShadow>? shadows,
     TextStyle? textStyle,
     EdgeInsetsGeometry? screenPadding,
+    Size? arrowSize,
     Duration? showDuration,
     Duration? transitionDuration,
     Duration? reverseTransitionDuration,
@@ -178,6 +185,7 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
       shadows: shadows ?? this.shadows,
       textStyle: textStyle ?? this.textStyle,
       screenPadding: screenPadding ?? this.screenPadding,
+      arrowSize: arrowSize ?? this.arrowSize,
       showDuration: showDuration ?? this.showDuration,
       transitionDuration: transitionDuration ?? this.transitionDuration,
       reverseTransitionDuration:
@@ -208,6 +216,7 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
         other.screenPadding,
         t,
       ),
+      arrowSize: Size.lerp(arrowSize, other.arrowSize, t),
       showDuration: takeOther ? other.showDuration : showDuration,
       transitionDuration: takeOther
           ? other.transitionDuration
@@ -240,6 +249,7 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
         listEquals(other.shadows, shadows) &&
         other.textStyle == textStyle &&
         other.screenPadding == screenPadding &&
+        other.arrowSize == arrowSize &&
         other.showDuration == showDuration &&
         other.transitionDuration == transitionDuration &&
         other.reverseTransitionDuration == reverseTransitionDuration &&
@@ -259,6 +269,7 @@ class AnchoredPopoverTheme extends ThemeExtension<AnchoredPopoverTheme> {
     shadows == null ? null : Object.hashAll(shadows!),
     textStyle,
     screenPadding,
+    arrowSize,
     showDuration,
     transitionDuration,
     reverseTransitionDuration,
